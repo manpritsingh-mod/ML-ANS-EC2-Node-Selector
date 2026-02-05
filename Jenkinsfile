@@ -14,11 +14,17 @@ pipeline {
     stages {
         stage('ML Node Selection') {
             agent any
+            // Alternative: Use specific label for Ubuntu agents
+            // agent { label 'ubuntu' }
 
             steps {
                 checkout scm
 
-                bat 'python --version'
+                // ============ UBUNTU/LINUX ============
+                sh 'python3 --version'
+                
+                // ============ WINDOWS (commented) ============
+                // bat 'python --version'
 
                 script {
                     def prediction = selectNode(

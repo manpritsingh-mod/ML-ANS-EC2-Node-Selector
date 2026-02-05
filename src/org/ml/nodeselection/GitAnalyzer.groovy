@@ -7,6 +7,9 @@ package org.ml.nodeselection
  * - Lines added/deleted
  * - Dependencies modified
  * - Branch information
+ * 
+ * PLATFORM: Ubuntu/Linux (sh commands)
+ * For Windows: Replace 'sh' with 'bat' and adjust commands accordingly
  */
 class GitAnalyzer implements Serializable {
 
@@ -70,13 +73,20 @@ class GitAnalyzer implements Serializable {
      * Get the current branch name
      */
     private String getBranchName() {
-        def output = steps.bat(
-            script: '@git rev-parse --abbrev-ref HEAD 2>nul || echo unknown',
+        // ============ UBUNTU/LINUX ============
+        def output = steps.sh(
+            script: 'git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown',
             returnStdout: true
         ).trim()
-        // Remove the command echo from bat output
-        def lines = output.split('\n')
-        return lines.length > 0 ? lines[-1].trim() : 'unknown'
+        return output ?: 'unknown'
+        
+        // ============ WINDOWS (commented) ============
+        // def output = steps.bat(
+        //     script: '@git rev-parse --abbrev-ref HEAD 2>nul || echo unknown',
+        //     returnStdout: true
+        // ).trim()
+        // def lines = output.split('\n')
+        // return lines.length > 0 ? lines[-1].trim() : 'unknown'
     }
 
     /**
@@ -84,10 +94,18 @@ class GitAnalyzer implements Serializable {
      */
     private int getFilesChanged() {
         try {
-            def output = steps.bat(
-                script: '@git diff --name-only HEAD~1 2>nul',
+            // ============ UBUNTU/LINUX ============
+            def output = steps.sh(
+                script: 'git diff --name-only HEAD~1 2>/dev/null || true',
                 returnStdout: true
             ).trim()
+            
+            // ============ WINDOWS (commented) ============
+            // def output = steps.bat(
+            //     script: '@git diff --name-only HEAD~1 2>nul',
+            //     returnStdout: true
+            // ).trim()
+            
             if (output.isEmpty()) return 0
             def lines = output.split('\n').findAll { it.trim() }
             return lines.size()
@@ -101,10 +119,18 @@ class GitAnalyzer implements Serializable {
      */
     private int getLinesAdded() {
         try {
-            def output = steps.bat(
-                script: '@git diff --numstat HEAD~1 2>nul',
+            // ============ UBUNTU/LINUX ============
+            def output = steps.sh(
+                script: 'git diff --numstat HEAD~1 2>/dev/null || true',
                 returnStdout: true
             ).trim()
+            
+            // ============ WINDOWS (commented) ============
+            // def output = steps.bat(
+            //     script: '@git diff --numstat HEAD~1 2>nul',
+            //     returnStdout: true
+            // ).trim()
+            
             if (output.isEmpty()) return 0
             
             int total = 0
@@ -125,10 +151,18 @@ class GitAnalyzer implements Serializable {
      */
     private int getLinesDeleted() {
         try {
-            def output = steps.bat(
-                script: '@git diff --numstat HEAD~1 2>nul',
+            // ============ UBUNTU/LINUX ============
+            def output = steps.sh(
+                script: 'git diff --numstat HEAD~1 2>/dev/null || true',
                 returnStdout: true
             ).trim()
+            
+            // ============ WINDOWS (commented) ============
+            // def output = steps.bat(
+            //     script: '@git diff --numstat HEAD~1 2>nul',
+            //     returnStdout: true
+            // ).trim()
+            
             if (output.isEmpty()) return 0
             
             int total = 0
@@ -161,10 +195,17 @@ class GitAnalyzer implements Serializable {
         def changed = 0
 
         try {
-            def changedFiles = steps.bat(
-                script: '@git diff --name-only HEAD~1 2>nul',
+            // ============ UBUNTU/LINUX ============
+            def changedFiles = steps.sh(
+                script: 'git diff --name-only HEAD~1 2>/dev/null || true',
                 returnStdout: true
             ).trim()
+            
+            // ============ WINDOWS (commented) ============
+            // def changedFiles = steps.bat(
+            //     script: '@git diff --name-only HEAD~1 2>nul',
+            //     returnStdout: true
+            // ).trim()
 
             depFiles.each { depFile ->
                 if (changedFiles.contains(depFile)) {
