@@ -43,10 +43,23 @@ class NodePredictor implements Serializable {
             def output = steps.bat(
                 script: '''
                     @echo off
+                    setlocal
+                    
+                    REM Remove existing venv to avoid conflicts
+                    if exist .venv rmdir /s /q .venv
+                    
+                    REM Create fresh virtual environment
                     python -m venv .venv
+                    if errorlevel 1 exit /b 1
+                    
+                    REM Activate venv
                     call .venv\\Scripts\\activate.bat
-                    python -m pip install --upgrade pip
-                    python -m pip install -r ml\\requirements.txt
+                    
+                    REM Install dependencies with no prompts
+                    python -m pip install --disable-pip-version-check --no-input -q -r ml\\requirements.txt
+                    if errorlevel 1 exit /b 1
+                    
+                    REM Run prediction
                     python ml\\predict.py --input ml_input.json --model ml\\model.pkl
                 ''',
                 returnStdout: true
