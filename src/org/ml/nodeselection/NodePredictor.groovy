@@ -39,26 +39,34 @@ class NodePredictor implements Serializable {
                 steps.echo 'ML predict script not found at ml/predict.py'
             }
 
-            def output = steps.sh(
+            // Windows-compatible Python execution
+            def output = steps.bat(
                 script: '''
-                    python3 -m venv .venv
-                    source .venv/bin/activate
+                    @echo off
+                    python -m venv .venv
+                    call .venv\\Scripts\\activate.bat
                     pip install --upgrade pip
-                    pip install -r ml/requirements.txt
-                    python ml/predict.py --input ml_input.json --model ml/model.pkl
+                    pip install -r ml\\requirements.txt
+                    python ml\\predict.py --input ml_input.json --model ml\\model.pkl
                 ''',
                 returnStdout: true
             ).trim()
 
+            // Extract JSON from bat output (skip command echoes)
+            def jsonLine = output.split('\n').findAll { line ->
+                line.trim().startsWith('{') && line.trim().endsWith('}')
+            }.last()
+
             // Parse JSON output
-            return steps.readJSON(text: output)
+            return steps.readJSON(text: jsonLine)
 
         } catch (Exception e) {
             steps.echo "ML prediction failed: ${e.message}"
             throw e
         } finally {
-            // Cleanup
-            steps.sh(script: 'rm -rf .venv ml_input.json', returnStdout: true)
+            // Cleanup - Windows compatible
+            steps.bat(script: '@if exist .venv rmdir /s /q .venv', returnStdout: true)
+            steps.bat(script: '@if exist ml_input.json del /f ml_input.json', returnStdout: true)
         }
     }
 }

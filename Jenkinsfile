@@ -22,7 +22,7 @@ pipeline {
             steps {
                 checkout scm
 
-                sh 'python --version'
+                bat 'python --version'
 
                 script {
                     def prediction = selectNode(

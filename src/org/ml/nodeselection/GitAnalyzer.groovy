@@ -30,57 +30,118 @@ class GitAnalyzer implements Serializable {
 
         // Get branch name
         try {
-            metrics.branch = steps.env.BRANCH_NAME ?:
-                steps.sh(script: 'git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"', returnStdout: true).trim()
+            metrics.branch = steps.env.BRANCH_NAME ?: getBranchName()
         } catch (Exception e) {
             metrics.branch = 'unknown'
         }
 
         // Files changed
         try {
-            def filesOutput = steps.sh(
-                script: 'git diff --name-only HEAD~1 2>/dev/null | wc -l || echo 0',
-                returnStdout: true
-            ).trim()
-            metrics.filesChanged = filesOutput.isInteger() ? filesOutput.toInteger() : 0
+            metrics.filesChanged = getFilesChanged()
         } catch (Exception e) {
             metrics.filesChanged = 0
         }
 
         // Lines added
         try {
-            def linesAddedOutput = steps.sh(
-                script: "git diff --numstat HEAD~1 2>/dev/null | awk '{sum+=\$1} END {print sum+0}' || echo 0",
-                returnStdout: true
-            ).trim()
-            metrics.linesAdded = linesAddedOutput.isInteger() ? linesAddedOutput.toInteger() : 0
+            metrics.linesAdded = getLinesAdded()
         } catch (Exception e) {
             metrics.linesAdded = 0
         }
 
         // Lines deleted
         try {
-            def linesDeletedOutput = steps.sh(
-                script: "git diff --numstat HEAD~1 2>/dev/null | awk '{sum+=\$2} END {print sum+0}' || echo 0",
-                returnStdout: true
-            ).trim()
-            metrics.linesDeleted = linesDeletedOutput.isInteger() ? linesDeletedOutput.toInteger() : 0
+            metrics.linesDeleted = getLinesDeleted()
         } catch (Exception e) {
             metrics.linesDeleted = 0
         }
 
         // Dependencies changed
         try {
-            def depsChangedOutput = steps.sh(
-                script: 'git diff --name-only HEAD~1 2>/dev/null | grep -cE "(pom.xml|build.gradle|package.json|requirements.txt|composer.json)" || echo 0',
-                returnStdout: true
-            ).trim()
-            metrics.depsChanged = depsChangedOutput.isInteger() ? depsChangedOutput.toInteger() : 0
+            metrics.depsChanged = checkDependencyChanges()
         } catch (Exception e) {
             metrics.depsChanged = 0
         }
 
         return metrics
+    }
+
+    /**
+     * Get the current branch name
+     */
+    private String getBranchName() {
+        def output = steps.bat(
+            script: '@git rev-parse --abbrev-ref HEAD 2>nul || echo unknown',
+            returnStdout: true
+        ).trim()
+        // Remove the command echo from bat output
+        def lines = output.split('\n')
+        return lines.length > 0 ? lines[-1].trim() : 'unknown'
+    }
+
+    /**
+     * Get number of files changed
+     */
+    private int getFilesChanged() {
+        try {
+            def output = steps.bat(
+                script: '@git diff --name-only HEAD~1 2>nul',
+                returnStdout: true
+            ).trim()
+            if (output.isEmpty()) return 0
+            def lines = output.split('\n').findAll { it.trim() }
+            return lines.size()
+        } catch (Exception e) {
+            return 0
+        }
+    }
+
+    /**
+     * Get number of lines added
+     */
+    private int getLinesAdded() {
+        try {
+            def output = steps.bat(
+                script: '@git diff --numstat HEAD~1 2>nul',
+                returnStdout: true
+            ).trim()
+            if (output.isEmpty()) return 0
+            
+            int total = 0
+            output.split('\n').each { line ->
+                def parts = line.trim().split(/\s+/)
+                if (parts.length >= 1 && parts[0].isInteger()) {
+                    total += parts[0].toInteger()
+                }
+            }
+            return total
+        } catch (Exception e) {
+            return 0
+        }
+    }
+
+    /**
+     * Get number of lines deleted
+     */
+    private int getLinesDeleted() {
+        try {
+            def output = steps.bat(
+                script: '@git diff --numstat HEAD~1 2>nul',
+                returnStdout: true
+            ).trim()
+            if (output.isEmpty()) return 0
+            
+            int total = 0
+            output.split('\n').each { line ->
+                def parts = line.trim().split(/\s+/)
+                if (parts.length >= 2 && parts[1].isInteger()) {
+                    total += parts[1].toInteger()
+                }
+            }
+            return total
+        } catch (Exception e) {
+            return 0
+        }
     }
 
     /**
@@ -100,18 +161,10 @@ class GitAnalyzer implements Serializable {
         def changed = 0
 
         try {
-            def changedFiles
-            if (steps.isUnix()) {
-                changedFiles = steps.sh(
-                    script: 'git diff --name-only HEAD~1 2>/dev/null || echo ""',
-                    returnStdout: true
-                ).trim()
-            } else {
-                changedFiles = steps.bat(
-                    script: '@git diff --name-only HEAD~1 2>nul',
-                    returnStdout: true
-                ).trim()
-            }
+            def changedFiles = steps.bat(
+                script: '@git diff --name-only HEAD~1 2>nul',
+                returnStdout: true
+            ).trim()
 
             depFiles.each { depFile ->
                 if (changedFiles.contains(depFile)) {
