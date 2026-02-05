@@ -45,8 +45,8 @@ class NodePredictor implements Serializable {
                     @echo off
                     python -m venv .venv
                     call .venv\\Scripts\\activate.bat
-                    pip install --upgrade pip
-                    pip install -r ml\\requirements.txt
+                    python -m pip install --upgrade pip
+                    python -m pip install -r ml\\requirements.txt
                     python ml\\predict.py --input ml_input.json --model ml\\model.pkl
                 ''',
                 returnStdout: true
