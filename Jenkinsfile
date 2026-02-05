@@ -13,11 +13,7 @@ pipeline {
 
     stages {
         stage('ML Node Selection') {
-            agent {
-                docker {
-                    image 'python:3.10'
-                }
-            }
+            agent any
 
             steps {
                 checkout scm

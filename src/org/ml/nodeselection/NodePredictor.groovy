@@ -39,47 +39,42 @@ class NodePredictor implements Serializable {
                 steps.echo 'ML predict script not found at ml/predict.py'
             }
 
-            // Windows-compatible Python execution
+            // Step 1: Clean up existing venv
+            steps.bat script: '@if exist .venv rmdir /s /q .venv', returnStatus: true
+
+            // Step 2: Create virtual environment
+            steps.bat script: '@python -m venv .venv', returnStatus: true
+
+            // Step 3: Install dependencies (using full path to avoid activate issues)
+            steps.bat script: '@.venv\\Scripts\\python.exe -m pip install --disable-pip-version-check --no-input -q -r ml\\requirements.txt', returnStatus: true
+
+            // Step 4: Run prediction script
             def output = steps.bat(
-                script: '''
-                    @echo off
-                    setlocal
-                    
-                    REM Remove existing venv to avoid conflicts
-                    if exist .venv rmdir /s /q .venv
-                    
-                    REM Create fresh virtual environment
-                    python -m venv .venv
-                    if errorlevel 1 exit /b 1
-                    
-                    REM Activate venv
-                    call .venv\\Scripts\\activate.bat
-                    
-                    REM Install dependencies with no prompts
-                    python -m pip install --disable-pip-version-check --no-input -q -r ml\\requirements.txt
-                    if errorlevel 1 exit /b 1
-                    
-                    REM Run prediction
-                    python ml\\predict.py --input ml_input.json --model ml\\model.pkl
-                ''',
+                script: '@.venv\\Scripts\\python.exe ml\\predict.py --input ml_input.json --model ml\\model.pkl',
                 returnStdout: true
             ).trim()
 
-            // Extract JSON from bat output (skip command echoes)
-            def jsonLine = output.split('\n').findAll { line ->
+            // Extract JSON from output (last line should be the JSON)
+            def lines = output.split('\r?\n')
+            def jsonLine = lines.findAll { line ->
                 line.trim().startsWith('{') && line.trim().endsWith('}')
-            }.last()
+            }
+
+            if (jsonLine.isEmpty()) {
+                steps.echo "No JSON found in output: ${output}"
+                throw new Exception("ML prediction did not return valid JSON")
+            }
 
             // Parse JSON output
-            return steps.readJSON(text: jsonLine)
+            return steps.readJSON(text: jsonLine.last().trim())
 
         } catch (Exception e) {
             steps.echo "ML prediction failed: ${e.message}"
             throw e
         } finally {
-            // Cleanup - Windows compatible
-            steps.bat(script: '@if exist .venv rmdir /s /q .venv', returnStdout: true)
-            steps.bat(script: '@if exist ml_input.json del /f ml_input.json', returnStdout: true)
+            // Cleanup
+            steps.bat script: '@if exist .venv rmdir /s /q .venv', returnStatus: true
+            steps.bat script: '@if exist ml_input.json del /f ml_input.json', returnStatus: true
         }
     }
 }
