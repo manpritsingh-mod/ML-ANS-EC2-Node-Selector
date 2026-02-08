@@ -10,6 +10,19 @@ A Jenkins Shared Library that uses Random Forest ML to predict build resource re
 
 ---
 
+## 🚀 What's New (v2.0)
+
+| Feature | v1.0 | v2.0 |
+|---------|------|------|
+| **Features** | 9 (git metrics only) | **27 (full pipeline context)** |
+| **Training Data** | 60 records | **1000+ records** |
+| **Project Detection** | ❌ | ✅ Python/Java/Node/React Native/Android/iOS |
+| **Pipeline Analysis** | ❌ | ✅ E2E tests, Docker, Emulator detection |
+| **Cache Awareness** | ❌ | ✅ First build, cache state |
+| **Model Accuracy** | ~40% | **~67% R²** |
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -38,7 +51,7 @@ Traditional Jenkins pipelines use static agent labels, leading to:
 
 ### Solution
 
-This library analyzes git commit metrics and uses ML to predict:
+This library analyzes **27 features** including git metrics, project type, and pipeline structure to predict:
 - **CPU Usage** (%)
 - **Memory Requirements** (GB)
 - **Build Duration** (minutes)
@@ -50,36 +63,54 @@ Then automatically selects the appropriate AWS EC2 instance type.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         JENKINS PIPELINE                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐  │
-│  │ Git Commit   │───▶│ GitAnalyzer  │───▶│ Feature Engineering  │  │
-│  │ (PR/Push)    │    │ (Groovy)     │    │ (9 features)         │  │
-│  └──────────────┘    └──────────────┘    └──────────┬───────────┘  │
-│                                                      │              │
-│                                                      ▼              │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐  │
-│  │ AWS EC2      │◀───│ LabelMapper  │◀───│ Random Forest Model  │  │
-│  │ Agent        │    │ (Groovy)     │    │ (Python/sklearn)     │  │
-│  └──────────────┘    └──────────────┘    └──────────────────────┘  │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           JENKINS PIPELINE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐    ┌────────────────┐    ┌────────────────────────────┐   │
+│  │ Git Commit   │───▶│ GitAnalyzer    │───▶│ Git Metrics                │   │
+│  │ (PR/Push)    │    │ (Groovy)       │    │ (files, lines, deps)       │   │
+│  └──────────────┘    └────────────────┘    └─────────────┬──────────────┘   │
+│                                                           │                  │
+│  ┌──────────────┐    ┌────────────────┐                  │                  │
+│  │ Workspace    │───▶│ PipelineAnalyzer│───▶ ┌──────────────────────────┐   │
+│  │ Analysis     │    │ (Groovy) [NEW] │    │ 27 Features Combined     │   │
+│  └──────────────┘    └────────────────┘    └─────────────┬──────────────┘   │
+│                                                           │                  │
+│                                                           ▼                  │
+│  ┌──────────────┐    ┌────────────────┐    ┌────────────────────────────┐   │
+│  │ AWS EC2      │◀───│ LabelMapper    │◀───│ Random Forest Model        │   │
+│  │ Agent        │    │ (Groovy)       │    │ (Python/sklearn)           │   │
+│  └──────────────┘    └────────────────┘    └────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Features
 
+### Core Capabilities
+
 | Feature | Description |
 |---------|-------------|
-| 🤖 **ML-Powered Prediction** | Random Forest model trained on historical build data |
-| 📊 **Git Metrics Analysis** | Automatically extracts files changed, lines added/deleted |
+| 🤖 **ML-Powered Prediction** | Random Forest model trained on 1000+ records |
+| 🔍 **Project Type Detection** | Auto-detects Python, Java, Node.js, React Native, Android, iOS |
+| 📊 **Pipeline Analysis** | Detects E2E tests, Docker builds, emulator usage |
+| 💾 **Cache Awareness** | Considers first build vs cached builds |
 | 🏷️ **Dynamic Label Selection** | Maps predictions to Jenkins agent labels |
-| ☁️ **AWS EC2 Integration** | Selects optimal instance type (T3a Small → 2X Large) |
-| 🔄 **Platform Agnostic** | Supports both Ubuntu/Linux and Windows agents |
-| 📈 **20% Safety Buffer** | Adds buffer to predictions for reliability |
+| ☁️ **AWS EC2 Integration** | Selects optimal instance type (T3 Small → 2X Large) |
+
+### 27 Input Features (v2.0)
+
+| Category | Features |
+|----------|----------|
+| **Project Context** | `project_type`, `repo_size_mb`, `is_monorepo` |
+| **Git Metrics** | `files_changed`, `lines_added`, `lines_deleted`, `test_files_changed`, `deps_file_changed`, `dependency_count`, `source_files_pct` |
+| **Pipeline Structure** | `stages_count`, `has_unit_tests`, `has_integration_tests`, `has_e2e_tests`, `has_docker_build`, `uses_emulator`, `has_deploy_stage`, `has_artifact_publish`, `parallel_stages`, `has_build_stage` |
+| **Build Context** | `branch_type`, `build_type`, `environment` |
+| **Cache State** | `is_first_build`, `cache_available`, `is_clean_build` |
+| **Time Context** | `time_of_day_hour` |
 
 ---
 
@@ -125,9 +156,9 @@ git --version
 | Default Version | `master` |
 | Retrieval Method | Modern SCM |
 | Source Code Management | Git |
-| Project Repository | `https://github.com/your-org/ML-ANS-EC2-Node-Selector.git` |
+| Project Repository | `https://github.com/manpritsingh-mod/ML-ANS-EC2-Node-Selector.git` |
 
-### 2. Prepare ML Model
+### 2. Train ML Model (Optional - Pre-trained model included)
 
 ```bash
 # Navigate to resources directory
@@ -136,9 +167,12 @@ cd resources/
 # Install dependencies
 pip install -r requirements.txt
 
-# Train model with your data
+# Generate enhanced training data
+python generate_enhanced_dataset.py
+
+# Train model with enhanced data
 python train_model.py \
-  --data-path sample_training_dataset.csv \
+  --data-path training_features.csv \
   --model-path ../ml/
 ```
 
@@ -146,13 +180,12 @@ python train_model.py \
 
 Ensure your Jenkins agents have labels matching the `LabelMapper`:
 
-| Label | Instance Type | Memory |
-|-------|---------------|--------|
-| `lightweight` | T3a Small | 1 GB |
-| `executor` | T3a Small | 2 GB |
-| `build` | T3a Large | 8 GB |
-| `test` | T3a X Large | 16 GB |
-| `heavytest` | T3a 2X Large | 32 GB |
+| Label | Instance Type | Memory | Use Case |
+|-------|---------------|--------|----------|
+| `aws-small` | T3.medium | 4 GB | Python, Node.js unit tests |
+| `aws-medium` | T3.large | 8 GB | Java builds, Docker |
+| `aws-large` | T3.xlarge | 16 GB | Android, iOS, E2E tests |
+| `aws-xlarge` | T3.2xlarge | 32 GB | Heavy mobile builds with emulator |
 
 ---
 
@@ -178,6 +211,7 @@ pipeline {
                     echo "Selected Label: ${prediction.label}"
                     echo "Instance Type: ${prediction.instanceType}"
                     echo "Predicted Memory: ${prediction.predictedMemoryGb} GB"
+                    echo "Project Type: ${prediction.projectType}"
                 }
             }
         }
@@ -230,18 +264,23 @@ pipeline {
 |-----------|------|---------|-------------|
 | `buildType` | String | `'debug'` | Build type: `debug` or `release` |
 | `modelPath` | String | `${JENKINS_HOME}/ml-models` | Path to ML model |
+| `useEnhancedAnalysis` | Boolean | `true` | Enable full pipeline analysis |
 
 ### Return Object
 
 ```groovy
 [
-    label: 'build',                    // Jenkins agent label
-    instanceType: 'T3a Large',         // AWS EC2 instance type
-    predictedMemoryGb: 4.5,            // Predicted memory in GB
-    predictedCpu: 45.2,                // Predicted CPU usage %
-    predictedTimeMinutes: 12.5,        // Predicted build time
-    confidence: 0.85,                  // Model confidence
-    gitMetrics: [                      // Analyzed git metrics
+    label: 'aws-large',               // Jenkins agent label
+    instanceType: 't3.xlarge',        // AWS EC2 instance type
+    predictedMemoryGb: 13.28,         // Predicted memory in GB
+    predictedCpu: 87.3,               // Predicted CPU usage %
+    predictedTimeMinutes: 106.1,      // Predicted build time
+    confidence: 'medium',             // Prediction confidence
+    projectType: 'react-native',      // Detected project type
+    hasE2ETests: 1,                   // E2E tests detected
+    usesEmulator: 1,                  // Emulator usage detected
+    cacheAvailable: 1,                // Cache state
+    gitMetrics: [                     // Analyzed git metrics
         filesChanged: 15,
         linesAdded: 350,
         linesDeleted: 120,
@@ -259,6 +298,10 @@ pipeline {
 | `ML_PREDICTED_MEMORY` | Predicted memory (GB) |
 | `ML_PREDICTED_CPU` | Predicted CPU (%) |
 | `ML_PREDICTED_TIME` | Predicted time (minutes) |
+| `ML_PROJECT_TYPE` | Detected project type |
+| `ML_HAS_E2E_TESTS` | E2E tests detected (0/1) |
+| `ML_USES_EMULATOR` | Emulator detected (0/1) |
+| `ML_PREDICTION_CONFIDENCE` | Prediction confidence level |
 
 ---
 
@@ -267,21 +310,30 @@ pipeline {
 ```
 ML-ANS-EC2-Node-Selector/
 ├── vars/
-│   └── selectNode.groovy          # Main pipeline step
+│   └── selectNode.groovy              # Main pipeline step (enhanced)
 ├── src/org/ml/nodeselection/
-│   ├── GitAnalyzer.groovy         # Git metrics extraction
-│   ├── NodePredictor.groovy       # ML model integration
-│   └── LabelMapper.groovy         # Label mapping logic
-├── resources/
-│   ├── train_model.py             # Model training script
-│   ├── predict.py                 # Prediction script
-│   ├── requirements.txt           # Python dependencies
-│   └── sample_training_dataset.csv
+│   ├── GitAnalyzer.groovy             # Git metrics extraction
+│   ├── PipelineAnalyzer.groovy        # Project/pipeline detection [NEW]
+│   ├── NodePredictor.groovy           # ML model integration
+│   └── LabelMapper.groovy             # Label mapping logic
 ├── ml/
-│   └── model.pkl                  # Trained model (generated)
+│   ├── model.pkl                      # Trained model (27 features)
+│   ├── predict.py                     # Enhanced prediction script
+│   └── features.json                  # Feature metadata
+├── resources/
+│   ├── generate_enhanced_dataset.py   # Dataset generation [NEW]
+│   ├── train_model.py                 # Enhanced training script
+│   ├── predict.py                     # Prediction script (dev)
+│   ├── requirements.txt               # Python dependencies
+│   ├── enhanced_training_data.csv     # 1000+ training records [NEW]
+│   ├── training_features.csv          # 27-feature dataset [NEW]
+│   └── old_sample_training_dataset.csv # Original 60-row dataset
 ├── docs/
-│   └── RANDOM_FOREST_EXPLAINED.md # How ML works
-├── Jenkinsfile                    # Example pipeline
+│   ├── FLOW_DOCUMENTATION.md          # Complete flow with diagrams [NEW]
+│   ├── EDGE_CASE_ANALYSIS.md          # Edge cases analysis [NEW]
+│   ├── ENHANCED_DATASET_IMPLEMENTATION_PLAN.md
+│   └── RANDOM_FOREST_EXPLAINED.md     # How ML works
+├── Jenkinsfile                        # Example pipeline
 └── README.md
 ```
 
@@ -289,45 +341,51 @@ ML-ANS-EC2-Node-Selector/
 
 ## How It Works
 
-### 1. Git Analysis
-```groovy
-// GitAnalyzer extracts metrics from the commit
-def metrics = [
-    filesChanged: 15,      // git diff --name-only HEAD~1 | wc -l
-    linesAdded: 350,       // git diff --numstat (column 1)
-    linesDeleted: 120,     // git diff --numstat (column 2)
-    depsChanged: 1,        // Files like pom.xml, package.json
-    branch: 'main'
-]
+### Complete Flow
+
+```
+1. Pipeline calls selectNode()
+        ↓
+2. GitAnalyzer extracts git metrics
+        ↓
+3. PipelineAnalyzer detects:
+   - Project type (package.json → Node.js/React Native)
+   - Pipeline config (E2E, Docker, Emulator)
+   - Cache state (first build, cache available)
+        ↓
+4. NodePredictor combines 27 features
+        ↓
+5. Python predict.py → model.pkl
+        ↓
+6. Random Forest returns [CPU, Memory, Time]
+        ↓
+7. LabelMapper → Jenkins label (aws-small/medium/large/xlarge)
+        ↓
+8. Pipeline runs on optimal node!
 ```
 
-### 2. Feature Engineering
-```python
-# predict.py transforms raw metrics into ML features
-features = {
-    'files_changed': 15,
-    'lines_added': 350,
-    'lines_deleted': 120,
-    'net_lines': 230,              # added - deleted
-    'total_changes': 470,          # added + deleted
-    'deps_changed': 1,
-    'is_main': 1,                  # branch in ['main', 'master']
-    'is_release': 0,               # buildType == 'release'
-    'code_density': 31.3           # total_changes / files_changed
-}
-```
+### Example Predictions
 
-### 3. Random Forest Prediction
-```
-100 Decision Trees → Average Predictions → Final Output
+| Scenario | CPU | Memory | Time | Label |
+|----------|-----|--------|------|-------|
+| Python + Unit Tests | 53% | 3.2 GB | 17 min | aws-small |
+| Java + Maven Build | 65% | 6.5 GB | 25 min | aws-medium |
+| Android + Emulator E2E | 85% | 14 GB | 90 min | aws-large |
+| React Native + Full E2E | 87% | 13 GB | 106 min | aws-large |
 
-Output: {cpu: 45.2, memoryGb: 4.5, timeMinutes: 12.5}
-```
+### Feature Importance (Top 10)
 
-### 4. Label Mapping
-```groovy
-// LabelMapper selects instance based on memory (+ 20% buffer)
-4.5 GB * 1.2 = 5.4 GB → Needs 8 GB → Label: 'build' → T3a Large
+```
+1. is_first_build         15.1%
+2. project_type           13.7%
+3. repo_size_mb            7.8%
+4. uses_emulator           7.7%
+5. cache_available         7.6%
+6. is_clean_build          5.9%
+7. dependency_count        4.1%
+8. lines_deleted           3.7%
+9. stages_count            3.6%
+10. lines_added            3.3%
 ```
 
 ---
@@ -340,10 +398,22 @@ Output: {cpu: 45.2, memoryGb: 4.5, timeMinutes: 12.5}
 /**
  * Main entry point for ML-based node selection
  * 
- * @param config Map with optional keys: buildType, modelPath
- * @return Map with label, instanceType, predictions, gitMetrics
+ * @param config Map with optional keys: buildType, modelPath, useEnhancedAnalysis
+ * @return Map with label, instanceType, predictions, projectType, gitMetrics
  */
 def call(Map config = [:])
+```
+
+### PipelineAnalyzer (NEW)
+
+```groovy
+/**
+ * Analyzes workspace for project type and pipeline configuration
+ * 
+ * @param config Optional overrides (buildType)
+ * @return Map with 27 features for ML prediction
+ */
+Map analyze(Map config = [:])
 ```
 
 ### GitAnalyzer
@@ -378,10 +448,10 @@ String getLabel(double predictedMemoryGb)
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| `ML model not found` | Model not trained | Run `train_model.py` |
+| `ML model not found` | Model not in workspace | Ensure `ml/model.pkl` exists |
 | `python3: command not found` | Python not installed | Install Python 3.10+ |
 | `git diff` returns empty | First commit / shallow clone | Use `git fetch --unshallow` |
-| Pipeline hangs at pip install | Network/proxy issues | Add `--timeout 60` flag |
+| Low prediction accuracy | Using old model | Retrain with enhanced dataset |
 
 ### Debug Mode
 
@@ -389,9 +459,50 @@ Add to your Jenkinsfile:
 ```groovy
 script {
     def prediction = selectNode(buildType: 'debug')
-    echo "Git Metrics: ${prediction.gitMetrics}"
+    echo "Project Type: ${prediction.projectType}"
+    echo "Has E2E Tests: ${prediction.hasE2ETests}"
+    echo "Uses Emulator: ${prediction.usesEmulator}"
+    echo "Cache Available: ${prediction.cacheAvailable}"
     echo "Full Prediction: ${prediction}"
 }
+```
+
+---
+
+## Model Training
+
+### Generate Enhanced Dataset
+
+```bash
+cd resources/
+python generate_enhanced_dataset.py
+```
+
+This creates 1000+ realistic training records with all 27 features.
+
+### Train Model
+
+```bash
+python train_model.py \
+  --data-path training_features.csv \
+  --model-path ../ml/
+```
+
+### Expected Output
+
+```
+Training Enhanced ML Model
+==========================
+Training samples: 800
+Features: 27
+
+Model Performance (Test Set):
+  Overall R² Score:  0.67
+  cpu_avg_pct     → R²: 0.63
+  memory_gb       → R²: 0.79
+  build_time_min  → R²: 0.59
+
+✅ Model saved: ../ml/model.pkl
 ```
 
 ---
@@ -417,6 +528,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **scikit-learn** - Machine Learning library
 - **Jenkins** - CI/CD automation platform
 - **AWS EC2** - Cloud compute infrastructure
+- **Kaggle AI-Driven CI/CD Pipeline Logs Dataset** - Training data patterns
 
 ---
 
