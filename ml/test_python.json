@@ -1,0 +1,11 @@
+{
+    "projectType": "python",
+    "hasUnitTests": 1,
+    "hasE2ETests": 0,
+    "usesEmulator": 0,
+    "isFirstBuild": 0,
+    "cacheAvailable": 1,
+    "filesChanged": 3,
+    "linesAdded": 50,
+    "buildType": "debug"
+}

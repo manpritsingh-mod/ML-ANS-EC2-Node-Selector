@@ -1,0 +1,10 @@
+{
+    "projectType": "react-native",
+    "hasE2ETests": 1,
+    "usesEmulator": 1,
+    "isFirstBuild": 0,
+    "cacheAvailable": 1,
+    "filesChanged": 10,
+    "linesAdded": 200,
+    "buildType": "release"
+}

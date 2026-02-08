@@ -1,0 +1,41 @@
+{
+  "features": [
+    "project_type",
+    "repo_size_mb",
+    "is_monorepo",
+    "branch_type",
+    "build_type",
+    "environment",
+    "files_changed",
+    "lines_added",
+    "lines_deleted",
+    "source_files_pct",
+    "deps_file_changed",
+    "dependency_count",
+    "test_files_changed",
+    "stages_count",
+    "has_build_stage",
+    "has_unit_tests",
+    "has_integration_tests",
+    "has_e2e_tests",
+    "has_deploy_stage",
+    "has_docker_build",
+    "uses_emulator",
+    "parallel_stages",
+    "has_artifact_publish",
+    "is_first_build",
+    "cache_available",
+    "is_clean_build",
+    "time_of_day_hour"
+  ],
+  "targets": [
+    "cpu_avg_pct",
+    "memory_gb",
+    "build_time_min"
+  ],
+  "metrics": {
+    "r2_score": 0.6725655945215738,
+    "mae": 13.563079352637994,
+    "cv_mean": 0.615305274606037
+  }
+}
