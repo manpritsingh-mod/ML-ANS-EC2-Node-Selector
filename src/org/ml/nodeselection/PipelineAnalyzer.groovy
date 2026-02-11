@@ -279,9 +279,10 @@ class PipelineAnalyzer implements Serializable {
     }
 
     /**
-     * Analyze pipeline structure from Jenkinsfile or common patterns.
-     * Detects both direct stage definitions AND shared library template calls
-     * (e.g. My_UnifiedCI templates like javaMaven_template, python_template).
+     * Analyze pipeline structure from Jenkinsfile.
+     * ALWAYS scans the actual Jenkinsfile content directly.
+     * Detects stages, build tools, tests, docker, emulator, deploy keywords.
+     * No hardcoded values — everything comes from the project's Jenkinsfile.
      */
     Map analyzePipelineStructure() {
         def info = [
@@ -299,161 +300,159 @@ class PipelineAnalyzer implements Serializable {
         ]
         
         try {
-            // Check for Jenkinsfile
-            if (steps.fileExists('Jenkinsfile')) {
-                def jenkinsfile = steps.readFile('Jenkinsfile')
-                
-                // ──────────────────────────────────────────────
-                // 1. Detect shared library usage
-                // ──────────────────────────────────────────────
-                def libraryMatch = (jenkinsfile =~ /@Library\s*\(\s*['"\[]([^)\]]+)/)
+            if (!steps.fileExists('Jenkinsfile')) {
+                steps.echo "  No Jenkinsfile found in workspace"
+                return info
+            }
+
+            def jenkinsfile = steps.readFile('Jenkinsfile')
+            def jfLower = jenkinsfile.toLowerCase()
+            
+            // ──────────────────────────────────────────────
+            // 1. Detect shared library (display only)
+            // ──────────────────────────────────────────────
+            try {
+                def libraryMatch = (jenkinsfile =~ /@Library\s*\(\s*['"(\[]([^)\]'\"]+)/)
                 if (libraryMatch.size() > 0) {
                     info.sharedLibrary = libraryMatch[0][1].trim()
-                    steps.echo "  Detected shared library: ${info.sharedLibrary}"
+                    steps.echo "  Shared Library: ${info.sharedLibrary}"
                 }
-                
-                // ──────────────────────────────────────────────
-                // 2. Detect UnifiedCI template calls
-                // Matches patterns like: javaMaven_template(config)
-                //                        python_template(config)
-                //                        nodejs_template(...)
-                // ──────────────────────────────────────────────
-                def templatePatterns = [
-                    // Java/Maven templates
-                    [pattern: ~/(?i)(javaMaven_template|java_maven_template)/, 
-                     template: 'javaMaven',
-                     stages: [stagesCount: 6, hasBuildStage: 1, hasUnitTests: 1, hasIntegrationTests: 1, hasDeployStage: 1]],
-                    
-                    // Python templates
-                    [pattern: ~/(?i)(python_template|pythonPipeline_template)/,
-                     template: 'python',
-                     stages: [stagesCount: 5, hasBuildStage: 1, hasUnitTests: 1, hasIntegrationTests: 0, hasDeployStage: 1]],
-                    
-                    // Node.js templates
-                    [pattern: ~/(?i)(nodejs_template|node_template)/,
-                     template: 'nodejs',
-                     stages: [stagesCount: 5, hasBuildStage: 1, hasUnitTests: 1, hasIntegrationTests: 0, hasDeployStage: 1]],
-                    
-                    // React Native templates
-                    [pattern: ~/(?i)(reactNative_template|react_native_template)/,
-                     template: 'reactNative',
-                     stages: [stagesCount: 8, hasBuildStage: 1, hasUnitTests: 1, hasE2ETests: 1, hasDeployStage: 1, usesEmulator: 1]],
-                    
-                    // Android templates
-                    [pattern: ~/(?i)(android_template|androidGradle_template)/,
-                     template: 'android',
-                     stages: [stagesCount: 7, hasBuildStage: 1, hasUnitTests: 1, hasE2ETests: 0, hasDeployStage: 1, usesEmulator: 1]],
-                    
-                    // iOS templates
-                    [pattern: ~/(?i)(ios_template|iosXcode_template)/,
-                     template: 'ios',
-                     stages: [stagesCount: 7, hasBuildStage: 1, hasUnitTests: 1, hasE2ETests: 0, hasDeployStage: 1]]
-                ]
-                
-                // Check each template pattern
-                def templateDetected = false
-                for (tmpl in templatePatterns) {
-                    if (jenkinsfile =~ tmpl.pattern) {
-                        info.detectedTemplate = tmpl.template
-                        // Apply template's known stages
-                        tmpl.stages.each { key, value ->
-                            info[key] = value
-                        }
-                        templateDetected = true
-                        steps.echo "  Detected template: ${tmpl.template} (${tmpl.stages.stagesCount} stages)"
-                        break
-                    }
-                }
-                
-                // ──────────────────────────────────────────────
-                // 3. If no template detected, analyze Jenkinsfile directly
-                // ──────────────────────────────────────────────
-                if (!templateDetected) {
-                    // Count stage blocks
-                    def stageMatches = (jenkinsfile =~ /stage\s*\(/)
-                    info.stagesCount = stageMatches.size()
-                    
-                    // Check for build stage keywords
-                    if (jenkinsfile.toLowerCase() =~ /(mvn |gradle |npm run build|pip install|go build|make )/) {
-                        info.hasBuildStage = 1
-                    }
-                    
-                    // Detect test types
-                    if (jenkinsfile.toLowerCase() =~ /(unit\s*test|mvn test|pytest|npm test|go test|junit)/) {
-                        info.hasUnitTests = 1
-                    }
-                    
-                    if (jenkinsfile.toLowerCase() =~ /(integration|integrationtest|mvn verify|failsafe)/) {
-                        info.hasIntegrationTests = 1
-                    }
-                    
-                    if (jenkinsfile.toLowerCase() =~ /(e2e|appium|selenium|detox|cypress|playwright)/) {
-                        info.hasE2ETests = 1
-                    }
-                    
-                    // Detect Docker
-                    if (jenkinsfile.toLowerCase() =~ /(docker\s+build|dockerfile|docker\.build|docker-compose)/) {
-                        info.hasDockerBuild = 1
-                    }
-                    
-                    // Detect emulator
-                    if (jenkinsfile.toLowerCase() =~ /(emulator|simulator|avd|xctest|xcrun)/) {
-                        info.usesEmulator = 1
-                    }
-                    
-                    // Detect deploy
-                    if (jenkinsfile.toLowerCase() =~ /(deploy|publish|release|upload|aws |kubectl |helm )/) {
-                        info.hasDeployStage = 1
-                    }
-                    
-                    // Detect parallel
-                    def parallelMatches = (jenkinsfile =~ /parallel\s*\{/)
-                    if (parallelMatches.size() > 0) {
-                        info.parallelStages = parallelMatches.size()
-                    }
-                }
-                
-                // ──────────────────────────────────────────────
-                // 4. Extract additional config from Jenkinsfile
-                // Look for config maps that define what stages to run
-                // e.g. runUnitTests: true, runIntegrationTests: true
-                // ──────────────────────────────────────────────
-                if (jenkinsfile =~ /(?i)runUnitTests\s*:\s*true/) {
-                    info.hasUnitTests = 1
-                }
-                if (jenkinsfile =~ /(?i)runIntegrationTests\s*:\s*true/) {
-                    info.hasIntegrationTests = 1
-                }
-                if (jenkinsfile =~ /(?i)runE2E\s*:\s*true/) {
-                    info.hasE2ETests = 1
-                }
-                if (jenkinsfile =~ /(?i)deployEnabled\s*:\s*true/) {
-                    info.hasDeployStage = 1
-                }
-                if (jenkinsfile =~ /(?i)dockerBuild\s*:\s*true/) {
-                    info.hasDockerBuild = 1
-                }
-                if (jenkinsfile =~ /(?i)runUnitTests\s*:\s*false/) {
-                    info.hasUnitTests = 0
-                }
-                if (jenkinsfile =~ /(?i)runIntegrationTests\s*:\s*false/) {
-                    info.hasIntegrationTests = 0
+            } catch (e) {
+                // Ignore regex errors
+            }
+            
+            // ──────────────────────────────────────────────
+            // 2. Detect template name (display only, no hardcoded stages)
+            // ──────────────────────────────────────────────
+            def templateNames = [
+                'javaMaven_template', 'java_maven_template',
+                'python_template', 'pythonPipeline_template',
+                'nodejs_template', 'node_template',
+                'reactNative_template', 'react_native_template',
+                'android_template', 'androidGradle_template',
+                'ios_template', 'iosXcode_template'
+            ]
+            
+            for (tmpl in templateNames) {
+                if (jfLower.contains(tmpl.toLowerCase())) {
+                    info.detectedTemplate = tmpl
+                    steps.echo "  Template: ${tmpl}"
+                    break
                 }
             }
             
             // ──────────────────────────────────────────────
-            // 5. Additional detection from workspace files
+            // 3. Count actual stage blocks
             // ──────────────────────────────────────────────
-            if (steps.fileExists('e2e') || steps.fileExists('__tests__/e2e') || 
-                steps.fileExists('tests/e2e') || steps.fileExists('cypress')) {
+            try {
+                def stageMatches = (jenkinsfile =~ /stage\s*\(/)
+                info.stagesCount = stageMatches.size()
+            } catch (e) {
+                info.stagesCount = 0
+            }
+            
+            // ──────────────────────────────────────────────
+            // 4. Detect BUILD stage (build tools / commands)
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(mvn |mvn\s+|maven|gradle |gradle\s+|npm run build|npm install|pip install|go build|make |cmake|ant |msbuild|dotnet build|cargo build)/) {
+                info.hasBuildStage = 1
+            }
+            // Also check tools block
+            if (jfLower =~ /tools\s*\{[^}]*(maven|gradle|jdk|nodejs|go|python)/) {
+                info.hasBuildStage = 1
+            }
+            
+            // ──────────────────────────────────────────────
+            // 5. Detect UNIT TESTS
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(unit\s*test|mvn test|mvn\s+test|gradle test|pytest|npm test|npm run test|go test|jest|mocha|junit|nunit|xunit|rspec|phpunit|cargo test)/) {
+                info.hasUnitTests = 1
+            }
+            // Check config flags
+            if (jenkinsfile =~ /(?i)runUnitTests\s*:\s*true/) {
+                info.hasUnitTests = 1
+            }
+            if (jenkinsfile =~ /(?i)runUnitTests\s*:\s*false/) {
+                info.hasUnitTests = 0
+            }
+            
+            // ──────────────────────────────────────────────
+            // 6. Detect INTEGRATION TESTS
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(integration\s*test|mvn verify|mvn\s+verify|failsafe|integration-test|integrationtest)/) {
+                info.hasIntegrationTests = 1
+            }
+            if (jenkinsfile =~ /(?i)runIntegrationTests\s*:\s*true/) {
+                info.hasIntegrationTests = 1
+            }
+            if (jenkinsfile =~ /(?i)runIntegrationTests\s*:\s*false/) {
+                info.hasIntegrationTests = 0
+            }
+            
+            // ──────────────────────────────────────────────
+            // 7. Detect E2E TESTS
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(e2e|end.to.end|appium|selenium|detox|cypress|playwright|puppeteer|nightwatch|testcafe)/) {
+                info.hasE2ETests = 1
+            }
+            if (jenkinsfile =~ /(?i)runE2E\s*:\s*true/) {
                 info.hasE2ETests = 1
             }
             
-            if (steps.fileExists('Dockerfile') || steps.fileExists('docker-compose.yml')) {
+            // ──────────────────────────────────────────────
+            // 8. Detect DOCKER
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(docker\s+build|docker\.build|docker-compose|dockerfile|docker push|docker tag|podman)/) {
+                info.hasDockerBuild = 1
+            }
+            if (jenkinsfile =~ /(?i)dockerBuild\s*:\s*true/) {
                 info.hasDockerBuild = 1
             }
             
-            // For mobile projects, check for test dependencies
+            // ──────────────────────────────────────────────
+            // 9. Detect EMULATOR / SIMULATOR
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(emulator|simulator|avd|xctest|xcrun|instruments|android\s*emulator|ios\s*simulator)/) {
+                info.usesEmulator = 1
+            }
+            
+            // ──────────────────────────────────────────────
+            // 10. Detect DEPLOY stage
+            // ──────────────────────────────────────────────
+            if (jfLower =~ /(deploy|publish|release|upload|aws\s|kubectl|helm|ansible|terraform|s3\s|ecr|ecs|gcloud|az\s|heroku|netlify|vercel)/) {
+                info.hasDeployStage = 1
+            }
+            if (jenkinsfile =~ /(?i)deployEnabled\s*:\s*true/) {
+                info.hasDeployStage = 1
+            }
+            
+            // ──────────────────────────────────────────────
+            // 11. Detect PARALLEL stages
+            // ──────────────────────────────────────────────
+            try {
+                def parallelMatches = (jenkinsfile =~ /parallel\s*\{/)
+                if (parallelMatches.size() > 0) {
+                    info.parallelStages = parallelMatches.size()
+                }
+            } catch (e) {
+                // Ignore
+            }
+            
+            // ──────────────────────────────────────────────
+            // 12. Detect from WORKSPACE files (not Jenkinsfile)
+            // ──────────────────────────────────────────────
+            if (steps.fileExists('e2e') || steps.fileExists('__tests__/e2e') || 
+                steps.fileExists('tests/e2e') || steps.fileExists('cypress') ||
+                steps.fileExists('cypress.config.js')) {
+                info.hasE2ETests = 1
+            }
+            
+            if (steps.fileExists('Dockerfile') || steps.fileExists('docker-compose.yml') ||
+                steps.fileExists('docker-compose.yaml')) {
+                info.hasDockerBuild = 1
+            }
+            
+            // Mobile project test dependencies
             if (steps.fileExists('package.json')) {
                 try {
                     def pkg = steps.readJSON(file: 'package.json')
@@ -463,8 +462,29 @@ class PipelineAnalyzer implements Serializable {
                         info.hasE2ETests = 1
                         info.usesEmulator = 1
                     }
+                    if (deps.containsKey('jest') || deps.containsKey('mocha') || deps.containsKey('vitest')) {
+                        info.hasUnitTests = 1
+                    }
+                    if (deps.containsKey('cypress') || deps.containsKey('playwright')) {
+                        info.hasE2ETests = 1
+                    }
                 } catch (e) {
                     // Ignore parse errors
+                }
+            }
+            
+            // Maven surefire / failsafe from pom.xml
+            if (steps.fileExists('pom.xml')) {
+                try {
+                    def pom = steps.readFile('pom.xml')
+                    if (pom.contains('maven-surefire-plugin') || pom.contains('src/test')) {
+                        info.hasUnitTests = 1
+                    }
+                    if (pom.contains('maven-failsafe-plugin')) {
+                        info.hasIntegrationTests = 1
+                    }
+                } catch (e) {
+                    // Ignore
                 }
             }
             
