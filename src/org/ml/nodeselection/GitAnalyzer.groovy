@@ -8,8 +8,8 @@ package org.ml.nodeselection
  * - Dependencies modified
  * - Branch information
  * 
- * PLATFORM: Ubuntu/Linux (sh commands)
- * For Windows: Replace 'sh' with 'bat' and adjust commands accordingly
+ * PLATFORM: Windows (bat commands)
+ * For Linux: Replace 'bat' with 'sh' and adjust commands accordingly
  */
 class GitAnalyzer implements Serializable {
 
@@ -73,20 +73,20 @@ class GitAnalyzer implements Serializable {
      * Get the current branch name
      */
     private String getBranchName() {
-        // ============ UBUNTU/LINUX ============
-        def output = steps.sh(
-            script: 'git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown',
+        // ============ WINDOWS ============
+        def output = steps.bat(
+            script: '@git rev-parse --abbrev-ref HEAD 2>nul || echo unknown',
             returnStdout: true
         ).trim()
-        return output ?: 'unknown'
-        
-        // ============ WINDOWS (commented) ============
-        // def output = steps.bat(
-        //     script: '@git rev-parse --abbrev-ref HEAD 2>nul || echo unknown',
+        def lines = output.split('\n')
+        return lines.length > 0 ? lines[-1].trim() : 'unknown'
+
+        // ============ UBUNTU/LINUX (commented) ============
+        // def output = steps.sh(
+        //     script: 'git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown',
         //     returnStdout: true
         // ).trim()
-        // def lines = output.split('\n')
-        // return lines.length > 0 ? lines[-1].trim() : 'unknown'
+        // return output ?: 'unknown'
     }
 
     /**
@@ -94,15 +94,15 @@ class GitAnalyzer implements Serializable {
      */
     private int getFilesChanged() {
         try {
-            // ============ UBUNTU/LINUX ============
-            def output = steps.sh(
-                script: 'git diff --name-only HEAD~1 2>/dev/null || true',
+            // ============ WINDOWS ============
+            def output = steps.bat(
+                script: '@git diff --name-only HEAD~1 2>nul',
                 returnStdout: true
             ).trim()
-            
-            // ============ WINDOWS (commented) ============
-            // def output = steps.bat(
-            //     script: '@git diff --name-only HEAD~1 2>nul',
+
+            // ============ UBUNTU/LINUX (commented) ============
+            // def output = steps.sh(
+            //     script: 'git diff --name-only HEAD~1 2>/dev/null || true',
             //     returnStdout: true
             // ).trim()
             
@@ -119,15 +119,15 @@ class GitAnalyzer implements Serializable {
      */
     private int getLinesAdded() {
         try {
-            // ============ UBUNTU/LINUX ============
-            def output = steps.sh(
-                script: 'git diff --numstat HEAD~1 2>/dev/null || true',
+            // ============ WINDOWS ============
+            def output = steps.bat(
+                script: '@git diff --numstat HEAD~1 2>nul',
                 returnStdout: true
             ).trim()
-            
-            // ============ WINDOWS (commented) ============
-            // def output = steps.bat(
-            //     script: '@git diff --numstat HEAD~1 2>nul',
+
+            // ============ UBUNTU/LINUX (commented) ============
+            // def output = steps.sh(
+            //     script: 'git diff --numstat HEAD~1 2>/dev/null || true',
             //     returnStdout: true
             // ).trim()
             
@@ -151,15 +151,15 @@ class GitAnalyzer implements Serializable {
      */
     private int getLinesDeleted() {
         try {
-            // ============ UBUNTU/LINUX ============
-            def output = steps.sh(
-                script: 'git diff --numstat HEAD~1 2>/dev/null || true',
+            // ============ WINDOWS ============
+            def output = steps.bat(
+                script: '@git diff --numstat HEAD~1 2>nul',
                 returnStdout: true
             ).trim()
-            
-            // ============ WINDOWS (commented) ============
-            // def output = steps.bat(
-            //     script: '@git diff --numstat HEAD~1 2>nul',
+
+            // ============ UBUNTU/LINUX (commented) ============
+            // def output = steps.sh(
+            //     script: 'git diff --numstat HEAD~1 2>/dev/null || true',
             //     returnStdout: true
             // ).trim()
             
@@ -195,15 +195,15 @@ class GitAnalyzer implements Serializable {
         def changed = 0
 
         try {
-            // ============ UBUNTU/LINUX ============
-            def changedFiles = steps.sh(
-                script: 'git diff --name-only HEAD~1 2>/dev/null || true',
+            // ============ WINDOWS ============
+            def changedFiles = steps.bat(
+                script: '@git diff --name-only HEAD~1 2>nul',
                 returnStdout: true
             ).trim()
-            
-            // ============ WINDOWS (commented) ============
-            // def changedFiles = steps.bat(
-            //     script: '@git diff --name-only HEAD~1 2>nul',
+
+            // ============ UBUNTU/LINUX (commented) ============
+            // def changedFiles = steps.sh(
+            //     script: 'git diff --name-only HEAD~1 2>/dev/null || true',
             //     returnStdout: true
             // ).trim()
 

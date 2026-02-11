@@ -12,7 +12,8 @@ package org.ml.nodeselection
  * This context enables accurate ML resource prediction by providing
  * all 27 features required by the enhanced model.
  * 
- * PLATFORM: Ubuntu/Linux (sh commands)
+ * PLATFORM: Windows (bat commands)
+ * For Linux: Replace 'bat' with 'sh' and adjust commands accordingly
  */
 class PipelineAnalyzer implements Serializable {
 
@@ -48,7 +49,7 @@ class PipelineAnalyzer implements Serializable {
      * @return Map containing all 27 features for ML model
      */
     Map analyze(Map config = [:]) {
-        steps.echo "🔍 PipelineAnalyzer: Starting workspace analysis..."
+        steps.echo "PipelineAnalyzer: Starting workspace analysis..."
         
         def context = [:]
         
@@ -103,7 +104,7 @@ class PipelineAnalyzer implements Serializable {
         // 12. Artifact publish (tied to release builds)
         context.hasArtifactPublish = (context.buildType.toLowerCase() == 'release') ? 1 : 0
         
-        steps.echo "🔍 PipelineAnalyzer: Analysis complete!"
+        steps.echo "PipelineAnalyzer: Analysis complete!"
         
         return context
     }
@@ -169,12 +170,21 @@ class PipelineAnalyzer implements Serializable {
      */
     int getRepoSize() {
         try {
-            // Get .git directory size as proxy for repo size
-            def output = steps.sh(
-                script: 'du -sm . 2>/dev/null | cut -f1',
+            // ============ WINDOWS ============
+            def output = steps.bat(
+                script: '@powershell -Command "(Get-ChildItem -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB" 2>nul',
                 returnStdout: true
             ).trim()
-            return output.isInteger() ? output.toInteger() : 100
+            def lines = output.split('\n')
+            def lastLine = lines[-1].trim()
+            return lastLine.isNumber() ? Math.round(lastLine.toDouble()).toInteger() : 100
+
+            // ============ UBUNTU/LINUX (commented) ============
+            // def output = steps.sh(
+            //     script: 'du -sm . 2>/dev/null | cut -f1',
+            //     returnStdout: true
+            // ).trim()
+            // return output.isInteger() ? output.toInteger() : 100
         } catch (e) {
             return 100  // Default estimate
         }
@@ -198,14 +208,25 @@ class PipelineAnalyzer implements Serializable {
                 }
             }
             
-            // Check for multiple package.json (more than 2)
-            def output = steps.sh(
-                script: 'find . -name "package.json" -type f 2>/dev/null | wc -l',
+            // ============ WINDOWS ============
+            def output = steps.bat(
+                script: '@powershell -Command "(Get-ChildItem -Recurse -Name package.json).Count" 2>nul',
                 returnStdout: true
             ).trim()
-            if (output.isInteger() && output.toInteger() > 2) {
+            def lines = output.split('\n')
+            def lastLine = lines[-1].trim()
+            if (lastLine.isInteger() && lastLine.toInteger() > 2) {
                 return 1
             }
+
+            // ============ UBUNTU/LINUX (commented) ============
+            // def output = steps.sh(
+            //     script: 'find . -name "package.json" -type f 2>/dev/null | wc -l',
+            //     returnStdout: true
+            // ).trim()
+            // if (output.isInteger() && output.toInteger() > 2) {
+            //     return 1
+            // }
             
             return 0
         } catch (e) {
