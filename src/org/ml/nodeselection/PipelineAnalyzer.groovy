@@ -177,16 +177,16 @@ class PipelineAnalyzer implements Serializable {
             ).trim()
             def lines = output.split('\n')
             def lastLine = lines[-1].trim()
-            return lastLine.isNumber() ? Math.round(lastLine.toDouble()).toInteger() : 100
+            return lastLine.isNumber() ? Math.round(lastLine.toDouble()).toInteger() : 0
 
             // ============ UBUNTU/LINUX (commented) ============
             // def output = steps.sh(
             //     script: 'du -sm . 2>/dev/null | cut -f1',
             //     returnStdout: true
             // ).trim()
-            // return output.isInteger() ? output.toInteger() : 100
+            // return output.isInteger() ? output.toInteger() : 0
         } catch (e) {
-            return 100  // Default estimate
+            return 0  // Could not determine repo size
         }
     }
 
@@ -283,15 +283,15 @@ class PipelineAnalyzer implements Serializable {
      */
     Map analyzePipelineStructure() {
         def info = [
-            stagesCount: 3,           // Default: checkout, build, test
-            hasBuildStage: 1,
-            hasUnitTests: 1,
+            stagesCount: 0,
+            hasBuildStage: 0,
+            hasUnitTests: 0,
             hasIntegrationTests: 0,
             hasE2ETests: 0,
             hasDeployStage: 0,
             hasDockerBuild: 0,
             usesEmulator: 0,
-            parallelStages: 1
+            parallelStages: 0
         ]
         
         try {
@@ -364,7 +364,8 @@ class PipelineAnalyzer implements Serializable {
     }
 
     /**
-     * Count project dependencies.
+     * Count project dependencies dynamically.
+     * Never returns static defaults - returns 0 if cannot detect.
      */
     int countDependencies(String projectType) {
         try {
@@ -384,33 +385,50 @@ class PipelineAnalyzer implements Serializable {
                         def content = steps.readFile('requirements.txt')
                         return content.split('\n').findAll { it.trim() && !it.startsWith('#') }.size()
                     }
+                    if (steps.fileExists('setup.py')) {
+                        def content = steps.readFile('setup.py')
+                        def deps = (content =~ /install_requires/).size()
+                        return deps > 0 ? (content =~ /['"][a-zA-Z]/).size() : 0
+                    }
                     break
                     
                 case 'java':
                 case 'android':
-                    // Estimate from build.gradle
+                    // Try pom.xml first (Maven)
+                    if (steps.fileExists('pom.xml')) {
+                        try {
+                            def content = steps.readFile('pom.xml')
+                            def deps = (content =~ /<dependency>/).size()
+                            return deps
+                        } catch (e) {
+                            // Fall through
+                        }
+                    }
+                    // Try build.gradle (Gradle)
                     if (steps.fileExists('build.gradle')) {
-                        def content = steps.readFile('build.gradle')
-                        def deps = (content =~ /implementation|compile|api/).size()
-                        return deps ?: 50
+                        try {
+                            def content = steps.readFile('build.gradle')
+                            def deps = (content =~ /implementation |compile |api |testImplementation /).size()
+                            return deps
+                        } catch (e) {
+                            // Fall through
+                        }
+                    }
+                    break
+                    
+                case 'ios':
+                    if (steps.fileExists('Podfile')) {
+                        def content = steps.readFile('Podfile')
+                        return (content =~ /pod '/).size()
                     }
                     break
             }
         } catch (e) {
-            // Ignore errors
+            steps.echo "Warning: Could not count dependencies: ${e.message}"
         }
         
-        // Default estimates by project type
-        def defaults = [
-            'python': 30,
-            'java': 50,
-            'nodejs': 100,
-            'react-native': 150,
-            'android': 80,
-            'ios': 40
-        ]
-        
-        return defaults[projectType] ?: 50
+        // Return 0 when we cannot dynamically detect
+        return 0
     }
 
     /**
