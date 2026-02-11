@@ -79,9 +79,10 @@ def call(Map config = [:]) {
     
     def allLabels = mapper.getAllLabels()
     allLabels.each { lbl ->
-        def config_node = LabelMapper.INSTANCES[lbl]
+        def instType = mapper.getInstanceType(mapper.getMemoryForLabel(lbl).toDouble())
+        def mem = mapper.getMemoryForLabel(lbl)
         def marker = (lbl == label) ? '  ✅ BEST' : ''
-        echo "│ ${lbl.padRight(13)}│ ${config_node.instance.padRight(16)}│ ${(config_node.memory + ' GB').padRight(9)}│${marker.padRight(10)}│"
+        echo "│ ${lbl.padRight(13)}│ ${instType.padRight(16)}│ ${(mem + ' GB').padRight(9)}│${marker.padRight(10)}│"
     }
     echo '└──────────────┴─────────────────┴──────────┴───────────┘'
 

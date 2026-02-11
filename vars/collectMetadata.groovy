@@ -77,15 +77,17 @@ def call(Map config = [:]) {
     echo '┌──────────────────────────────────────┐'
     echo '│         PIPELINE STRUCTURE           │'
     echo '├──────────────────────────────────────┤'
-    echo "│  Stages          : ${pipelineContext.stagesCount ?: 0}"
-    echo "│  Build Stage     : ${pipelineContext.hasBuildStage == 1 ? '✅' : '❌'}"
-    echo "│  Unit Tests      : ${pipelineContext.hasUnitTests == 1 ? '✅' : '❌'}"
-    echo "│  Integration     : ${pipelineContext.hasIntegrationTests == 1 ? '✅' : '❌'}"
-    echo "│  E2E Tests       : ${pipelineContext.hasE2ETests == 1 ? '✅' : '❌'}"
-    echo "│  Docker Build    : ${pipelineContext.hasDockerBuild == 1 ? '✅' : '❌'}"
-    echo "│  Emulator        : ${pipelineContext.usesEmulator == 1 ? '✅' : '❌'}"
-    echo "│  Deploy Stage    : ${pipelineContext.hasDeployStage == 1 ? '✅' : '❌'}"
-    echo "│  Parallel        : ${pipelineContext.parallelStages ?: 0}"
+    echo "│  Shared Library   : ${pipelineContext.sharedLibrary ?: 'none'}"
+    echo "│  Template Used    : ${pipelineContext.detectedTemplate ?: 'none'}"
+    echo "│  Stages           : ${pipelineContext.stagesCount ?: 0}"
+    echo "│  Build Stage      : ${pipelineContext.hasBuildStage == 1 ? '✅' : '❌'}"
+    echo "│  Unit Tests       : ${pipelineContext.hasUnitTests == 1 ? '✅' : '❌'}"
+    echo "│  Integration      : ${pipelineContext.hasIntegrationTests == 1 ? '✅' : '❌'}"
+    echo "│  E2E Tests        : ${pipelineContext.hasE2ETests == 1 ? '✅' : '❌'}"
+    echo "│  Docker Build     : ${pipelineContext.hasDockerBuild == 1 ? '✅' : '❌'}"
+    echo "│  Emulator         : ${pipelineContext.usesEmulator == 1 ? '✅' : '❌'}"
+    echo "│  Deploy Stage     : ${pipelineContext.hasDeployStage == 1 ? '✅' : '❌'}"
+    echo "│  Parallel         : ${pipelineContext.parallelStages ?: 0}"
     echo '└──────────────────────────────────────┘'
 
     echo '┌──────────────────────────────────────┐'

@@ -15,7 +15,7 @@
  *   - Selects the best AWS EC2 node for this build
  *   - Shows all available nodes for comparison
  */
-@Library('ML-ANS-EC2-Node-Selector') _
+@Library(['ML-ANS-EC2-Node-Selector', 'My_UnifiedCI']) _
 
 pipeline {
     agent any
