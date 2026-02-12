@@ -113,9 +113,12 @@ def engineer_features(context):
     
     # === Branch/Build Context ===
     branch = context.get('branch', 'develop')
-    branch_type_str = context.get('branchType', None)
-    if branch_type_str:
-        features['branch_type'] = BRANCH_TYPES.get(branch_type_str.lower(), 0)
+    branch_type_val = context.get('branchType', context.get('branch_type', None))
+    if isinstance(branch_type_val, int):
+        # PipelineAnalyzer sends branchType as int (0-4) — use directly
+        features['branch_type'] = branch_type_val
+    elif branch_type_val and isinstance(branch_type_val, str):
+        features['branch_type'] = BRANCH_TYPES.get(branch_type_val.lower(), 0)
     else:
         # Infer from branch name
         if 'feature' in branch.lower():
@@ -160,7 +163,7 @@ def engineer_features(context):
     features['has_deploy_stage'] = int(context.get('hasDeployStage', context.get('has_deploy_stage', 0)))
     features['has_docker_build'] = int(context.get('hasDockerBuild', context.get('has_docker_build', 0)))
     features['uses_emulator'] = int(context.get('usesEmulator', context.get('uses_emulator', 0)))
-    features['parallel_stages'] = int(context.get('parallelStages', context.get('parallel_stages', 1)))
+    features['parallel_stages'] = int(context.get('parallelStages', context.get('parallel_stages', 0)))
     features['has_artifact_publish'] = int(context.get('hasArtifactPublish', context.get('has_artifact_publish', 0)))
     
     # === Cache/Build State ===
