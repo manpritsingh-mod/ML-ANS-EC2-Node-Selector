@@ -322,23 +322,46 @@ class PipelineAnalyzer implements Serializable {
             }
             
             // ──────────────────────────────────────────────
-            // 2. Detect template name (display only, no hardcoded stages)
+            // 2. Detect template/vars function calls (DYNAMIC)
+            //    Scans Jenkinsfile lines for function calls that
+            //    are NOT Jenkins/Groovy built-in steps.
+            //    Works with ANY template name — no hardcoded list.
             // ──────────────────────────────────────────────
-            def templateNames = [
-                'javaMaven_template', 'java_maven_template',
-                'python_template', 'pythonPipeline_template',
-                'nodejs_template', 'node_template',
-                'reactNative_template', 'react_native_template',
-                'android_template', 'androidGradle_template',
-                'ios_template', 'iosXcode_template'
-            ]
-            
-            for (tmpl in templateNames) {
-                if (jfLower.contains(tmpl.toLowerCase())) {
-                    info.detectedTemplate = tmpl
-                    steps.echo "  Template: ${tmpl}"
-                    break
+            try {
+                def jenkinsBuiltins = [
+                    'pipeline', 'stage', 'steps', 'script', 'node', 'agent',
+                    'echo', 'sh', 'bat', 'checkout', 'sleep', 'error', 'timeout',
+                    'readFile', 'writeFile', 'fileExists', 'readJSON', 'writeJSON',
+                    'dir', 'pwd', 'input', 'parallel', 'retry', 'catchError',
+                    'archiveArtifacts', 'junit', 'stash', 'unstash',
+                    'withCredentials', 'withEnv', 'build', 'wrap', 'mail',
+                    'properties', 'library', 'choice', 'string', 'booleanParam',
+                    'post', 'always', 'success', 'failure', 'unstable',
+                    'environment', 'parameters', 'tools', 'when', 'expression',
+                    'def', 'return', 'new', 'import', 'try', 'catch', 'finally',
+                    'if', 'else', 'for', 'while', 'switch', 'case',
+                    'collectMetadata', 'mlPredict', 'selectNode'
+                ]
+                
+                def lines = jenkinsfile.split('\n')
+                for (line in lines) {
+                    def trimmed = line.trim()
+                    // Skip blank lines and comments
+                    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue
+                    
+                    // Match: functionName( at start of line
+                    def match = (trimmed =~ /^(\w+)\s*\(/)
+                    if (match) {
+                        def funcName = match[0][1]
+                        if (!jenkinsBuiltins.contains(funcName) && funcName.length() > 2) {
+                            info.detectedTemplate = funcName
+                            steps.echo "  Template call: ${funcName}"
+                            break
+                        }
+                    }
                 }
+            } catch (e) {
+                // Ignore detection errors
             }
             
             // ──────────────────────────────────────────────
