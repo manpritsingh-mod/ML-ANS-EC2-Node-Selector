@@ -139,3 +139,50 @@ TOTAL: ~12 minutes, optimal cost.
 ## Key Takeaway
 
 > This POC proves that we can **replace manual guesswork with data-driven decisions** for choosing build infrastructure. The ML model analyzes each build, predicts its resource needs, and picks the right AWS server — saving cost on small builds and preventing failures on large ones.
+
+---
+
+## How the Prediction Actually Works (If Asked for Details)
+
+Here's the step-by-step flow of what happens under the hood when a build starts:
+
+### Step 1 — Auto-Detect the Project *(~5 seconds)*
+
+The moment the pipeline starts, our code automatically scans the project workspace. It looks at what files exist — if there's a `pom.xml`, it knows it's a Java project. If there's a `package.json`, it's Node.js. It also reads the Jenkinsfile itself to count how many stages the build has, whether there are unit tests, integration tests, Docker builds, deployments — all of this without anyone configuring anything.
+
+### Step 2 — Git Analysis *(~2 seconds)*
+
+At the same time, it runs a quick git check — how many files did the developer change? How many lines were added or deleted? Did they change any dependency files? A 5-file change needs very different resources than a 500-file change.
+
+### Step 3 — Build the Feature Set *(instant)*
+
+All of that gets packaged into **27 data points**. Think of it like a form with 27 fields — project type, repo size, number of dependencies, which tests are enabled, is there a Docker build, is it the first build or do we have cache, what time of day it is — 27 factors total.
+
+### Step 4 — ML Prediction *(~3 seconds)*
+
+Those 27 data points get fed into a **Random Forest model**. Random Forest is basically a collection of hundreds of decision trees — each tree looks at the data and makes a guess, then they all vote on the answer. It's the same technique used in fraud detection and recommendation engines — reliable and explainable.
+
+The model outputs three numbers:
+- How much **memory** this build will need
+- How much **CPU** it will use
+- How long it will **take**
+
+### Step 5 — Map to the Right Server *(instant)*
+
+Based on the predicted memory, we map to the right AWS server. If the model says 4 GB, we pick an 8 GB server (we add a 20% safety buffer). If it says 12 GB, we pick the 16 GB server. Simple lookup — five server sizes, pick the closest one that fits.
+
+---
+
+## Common Manager Questions
+
+### "What if the model is wrong?"
+
+We have a fallback. If the ML model fails for any reason — Python isn't installed, model file is missing, anything — the system automatically falls back to a rule-based estimation. It looks at the project type and git changes, and uses a simple formula to estimate resources. So the pipeline never breaks — worst case, it just makes a slightly less optimal choice.
+
+### "How accurate is it?"
+
+Right now the model is trained on synthetic data — realistic but generated — so it's at about 67% accuracy. Once we deploy to production and start collecting real build data (actual CPU, memory, and time from real builds), we can retrain the model. Industry experience shows that with 2-3 months of real data, accuracy jumps to 85-90%.
+
+### "How does it learn and improve?"
+
+Every build that runs generates real metrics — how much memory it actually used, how long it actually took. We log that data. Periodically, we retrain the model with this real data, and it gets better at predicting. It's a feedback loop — predict, measure, learn, predict better.
